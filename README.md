@@ -2,7 +2,7 @@
 
 ## Code sources
 
-Each directory contains execution results used in the <strong>results display</strong>
+Each directory contains execution results used in the <strong>results display</strong> and scripts for generating the results
 
 <ul>
 <li>grasp_src/</li>
