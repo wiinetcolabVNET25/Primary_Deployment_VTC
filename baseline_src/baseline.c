@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <time.h>
+#include "mergesort.h"
 
 #define MAX_CELL_GRID_WIDTH         100
 #define MAX_CELL_GRID_HEIGHT        100
@@ -23,13 +24,6 @@ typedef struct trace_
     int r;
 
 } struct_trace;
-
-typedef struct solution_
-{
-    int x;
-    int y;
-
-} struct_solution;
 
 typedef struct baseline_input_ 
 {
@@ -64,8 +58,8 @@ char* output_error_msg);
 void baseline(struct_trace* trace, int trace_size, struct_baseline_input baseline_input,
 struct_baseline_output* output_baseline_output);
 int get_num_frequented_cells(int matrix[MAX_CELL_GRID_WIDTH][MAX_CELL_GRID_HEIGHT]);
-void get_max_cell_coords_and_zero_it(int matrix[MAX_CELL_GRID_WIDTH][MAX_CELL_GRID_HEIGHT], 
-int *output_x_coord, int* output_y_coord);
+void flatten_matrix(int matrix[MAX_CELL_GRID_WIDTH][MAX_CELL_GRID_HEIGHT], 
+    struct_solution v[]);
 // ==================== BASELINE FUNCTIONS ================= //
 
 
@@ -304,12 +298,14 @@ struct_baseline_output* output_baseline_output)
     (number_of_most_frequent_cells_to_pick > number_of_frequented_cells) ? 
     number_of_frequented_cells : number_of_most_frequent_cells_to_pick;
 
+    struct_solution flatten[MAX_CELL_GRID_WIDTH * MAX_CELL_GRID_HEIGHT];
+    flatten_matrix(cell_frequency, flatten);
+
+    mergesort(flatten, 0, MAX_CELL_GRID_WIDTH * MAX_CELL_GRID_HEIGHT -1, 0);
+
     while (solution_size < solution_size_to_achieve)
     {
-        struct_solution chosen_position;
-        get_max_cell_coords_and_zero_it(cell_frequency, &(chosen_position.x), &(chosen_position.y));
-
-        output_baseline_output->solution[solution_size] = chosen_position;
+        output_baseline_output->solution[solution_size] = flatten[solution_size];
         solution_size += 1;
     }
 
@@ -338,27 +334,22 @@ int get_num_frequented_cells(int matrix[MAX_CELL_GRID_WIDTH][MAX_CELL_GRID_HEIGH
     return num_frequented_cells;
 }
 
-void get_max_cell_coords_and_zero_it(int matrix[MAX_CELL_GRID_WIDTH][MAX_CELL_GRID_HEIGHT], 
-int *output_x_coord, int* output_y_coord)
+void flatten_matrix(int matrix[MAX_CELL_GRID_WIDTH][MAX_CELL_GRID_HEIGHT], 
+    struct_solution v[])
 {
-    int max_x = 0;
-	int max_y = 0;
-	int i, j;
-	for (i = 0; i < MAX_CELL_GRID_WIDTH; i++)
-	{
-		for (j = 0; j < MAX_CELL_GRID_HEIGHT; j++)
-		{
-			if (matrix[i][j] > matrix[max_x][max_y])
-			{
-				max_x = i;
-				max_y = j;
-			}
-		}
-	}
-	
-	matrix[max_x][max_y] = 0;
-	*output_x_coord = max_x;
-	*output_y_coord = max_y;
+    int v_ind = 0;
+    int i, j;
+    for (i = 0; i < MAX_CELL_GRID_WIDTH; i++)
+    {
+        for (j = 0; j < MAX_CELL_GRID_HEIGHT; j++)
+        {
+            v[v_ind].x = i;
+            v[v_ind].y = j;
+            v[v_ind].value = matrix[i][j];
+
+            v_ind++;
+        }
+    }
 }
 
 int write_summary_to_file(struct_baseline_input baseline_input, 
@@ -379,7 +370,7 @@ struct_baseline_output baseline_output, char* output_error_msg)
     
     fprintf(output_file, "N. RSUS TO PICK (INPUT): %d\n", baseline_input.number_of_most_frequent_cells_to_pick);
     fprintf(output_file, "N. RSUS (ACTUAL): %d\n", baseline_output.solution_size);
-    fprintf(output_file, "TOTAL EXECUTION TIME: %.06f\n\n", baseline_output.total_execution_time);
+    fprintf(output_file, "BASELINE TOTAL EXECUTION TIME: %.06f\n\n", baseline_output.total_execution_time);
 
     fclose(output_file);
 

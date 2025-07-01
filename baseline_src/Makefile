@@ -1,2 +1,2 @@
 build:
-	gcc -Wall baseline.c -o baseline
+	gcc -Wall mergesort.c baseline.c -o baseline
