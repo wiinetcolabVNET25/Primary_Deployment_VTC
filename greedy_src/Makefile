@@ -1,2 +1,2 @@
 build:
-	gcc -Wall greedy.c -o greedy
+	gcc -Wall mergesort.c greedy.c -o greedy
