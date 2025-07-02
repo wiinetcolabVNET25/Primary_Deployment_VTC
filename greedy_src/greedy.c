@@ -35,7 +35,6 @@ typedef struct greedy_input_
 
 typedef struct greedy_output_
 {
-    double total_execution_time;
     int solution_size;
     struct_solution solution[MAX_NUMBER_OF_RSUS];
     int solution_obj_f_value;
@@ -102,7 +101,9 @@ void reset_vehicles(int *vehicles, int tam);
 
 // ==================== OUTPUT FUNCTIONS ==================== //
 int write_summary_to_file(struct_greedy_input greedy_input, 
-struct_greedy_output greedy_output, char* output_error_msg);
+struct_greedy_output greedy_output, 
+double trace_read_timer, double execution_time,
+char* output_error_msg);
 
 int write_rsus_to_file(
     struct_greedy_input n_deployment_input, 
@@ -139,6 +140,8 @@ int main(int argc, char** argv)
 
     // -------------------- 1.2 TRACE FILE -------------------- //
 
+    clock_t begin_trace_read_timer = clock();
+
     struct_trace *trace = (struct_trace *) malloc(sizeof(struct_trace) * MAX_TRACE_SIZE);
     if (!trace)
     {
@@ -156,14 +159,23 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    clock_t end_trace_read_timer = clock();
+    double trace_read_time = (double) (end_trace_read_timer - begin_trace_read_timer) / CLOCKS_PER_SEC;
+
     // ==================== 2 - RUN =========================== //
+
+    clock_t begin_execution_timer = clock();
 
     struct_greedy_output greedy_output;
     greedy(trace, trace_size, greedy_input, &greedy_output);
 
+    clock_t end_execution_timer = clock();
+    double execution_time = (double) (end_execution_timer - begin_execution_timer) / CLOCKS_PER_SEC;
+
     // ==================== 3 - WRITE RESULTS ================= //
 
-    status = write_summary_to_file(greedy_input, greedy_output, error_msg);
+    status = write_summary_to_file(greedy_input, greedy_output, 
+        trace_read_time, execution_time, error_msg);
     if (status != 0)
     {
         fprintf(stderr, "GREEDY: OUTPUT SUMMARY FILE ERROR: %s\n", error_msg);
@@ -356,8 +368,6 @@ void greedy(
     (number_of_rsus_to_pick > number_of_frequented_cells) ? 
     number_of_frequented_cells : number_of_rsus_to_pick;
 
-    clock_t begin_timer = clock();
-
     struct_solution flatten[MAX_CELL_GRID_WIDTH * MAX_CELL_GRID_HEIGHT];
     flatten_matrix(cells_scores, flatten);
 
@@ -377,11 +387,6 @@ void greedy(
         greedy_input.contacts_time_threshold,
         greedy_input.number_of_contacts
     );
-    
-    clock_t end_timer = clock();
-    double execution_time_in_secs = (double) (end_timer - begin_timer) / CLOCKS_PER_SEC;
-
-    output_greedy_output->total_execution_time = execution_time_in_secs;
 
     output_greedy_output->solution_size = solution_size;
 
@@ -512,6 +517,7 @@ void flatten_matrix(int matrix[MAX_CELL_GRID_WIDTH][MAX_CELL_GRID_HEIGHT],
 int write_summary_to_file(
     struct_greedy_input greedy_input, 
     struct_greedy_output greedy_output, 
+    double trace_read_time, double execution_time,
     char* output_error_msg)
 {
     char output_file_name[MAX_INPUT_FILE_PATH_SIZE + 100];
@@ -538,9 +544,10 @@ int write_summary_to_file(
         greedy_input.number_of_contacts);
     fprintf(output_file, "CONTACTS TIME INTERVAL: %d\n",
         greedy_input.contacts_time_threshold);
-
-    fprintf(output_file, "TOTAL EXECUTION TIME: %.06f\n\n", 
-        greedy_output.total_execution_time);
+    fprintf(output_file, "TRACE READ EXECUTION TIME: %.06lf\n",
+        trace_read_time);
+    fprintf(output_file, "GREEDY EXECUTION TIME: %.06f\n\n",
+        execution_time);
 
     fprintf(output_file, "-------------------- BEST SOLUTION ---------------------------\n\n");
 

@@ -33,7 +33,6 @@ typedef struct baseline_input_
 
 typedef struct baseline_output_
 {
-    double total_execution_time;
     struct_solution solution[MAX_NUMBER_OF_RSUS];
     int solution_size;
 
@@ -64,8 +63,12 @@ void flatten_matrix(int matrix[MAX_CELL_GRID_WIDTH][MAX_CELL_GRID_HEIGHT],
 
 
 // ==================== OUTPUT FUNCTIONS ==================== //
-int write_summary_to_file(struct_baseline_input baseline_input, 
-struct_baseline_output baseline_output, char* output_error_msg);
+int write_summary_to_file(
+    struct_baseline_input baseline_input, 
+    struct_baseline_output baseline_output, 
+    double trace_read_time, double execution_time,
+    char* output_error_msg
+);
 int write_rsus_to_file(struct_baseline_input baseline_input, 
 struct_baseline_output baseline_output, char* output_error_msg);
 // ==================== OUTPUT FUNCTIONS ==================== //
@@ -97,6 +100,8 @@ int main(int argc, char** argv)
 
     // -------------------- 1.2 TRACE FILE -------------------- //
 
+    clock_t begin_trace_read_timer = clock();
+
     struct_trace *trace = (struct_trace *) malloc(sizeof(struct_trace) * MAX_TRACE_SIZE);
     if (!trace)
     {
@@ -114,14 +119,23 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    clock_t end_trace_read_timer = clock();
+    double trace_read_time = (double) (end_trace_read_timer - begin_trace_read_timer) / CLOCKS_PER_SEC;
+
     // ==================== 2 - RUN =========================== //
+
+    clock_t begin_execution_timer = clock();
 
     struct_baseline_output baseline_output;
     baseline(trace, trace_size, baseline_input, &baseline_output);
 
+    clock_t end_execution_timer = clock();
+    double execution_time = (double) (end_execution_timer - begin_execution_timer) / CLOCKS_PER_SEC;
+
     // ==================== 3 - WRITE RESULTS ================= //
 
-    status = write_summary_to_file(baseline_input, baseline_output, error_msg);
+    status = write_summary_to_file(baseline_input, baseline_output, 
+        trace_read_time, execution_time, error_msg);
     if (status != 0)
     {
         printf("BASELINE: OUTPUT SUMMARY FILE ERROR: %s\n", error_msg);
@@ -284,8 +298,6 @@ struct_baseline_output* output_baseline_output)
 
     int cell_frequency[MAX_CELL_GRID_WIDTH][MAX_CELL_GRID_HEIGHT] = {0};
 
-    clock_t begin_timer = clock();
-
     int i;
     for (i = 0; i < trace_size; i++)
     {
@@ -309,10 +321,6 @@ struct_baseline_output* output_baseline_output)
         solution_size += 1;
     }
 
-    clock_t end_timer = clock();
-    double execution_time_in_secs = (double) (end_timer - begin_timer) / CLOCKS_PER_SEC;
-
-    output_baseline_output->total_execution_time = execution_time_in_secs;
     output_baseline_output->solution_size = solution_size;
 }
 
@@ -353,7 +361,9 @@ void flatten_matrix(int matrix[MAX_CELL_GRID_WIDTH][MAX_CELL_GRID_HEIGHT],
 }
 
 int write_summary_to_file(struct_baseline_input baseline_input, 
-struct_baseline_output baseline_output, char* output_error_msg)
+struct_baseline_output baseline_output, 
+double trace_read_time, double execution_time,
+char* output_error_msg)
 {
     char output_file_name[MAX_INPUT_FILE_PATH_SIZE + 100];
     sprintf(output_file_name, "n=%d_summary.txt", 
@@ -370,7 +380,8 @@ struct_baseline_output baseline_output, char* output_error_msg)
     
     fprintf(output_file, "N. RSUS TO PICK (INPUT): %d\n", baseline_input.number_of_most_frequent_cells_to_pick);
     fprintf(output_file, "N. RSUS (ACTUAL): %d\n", baseline_output.solution_size);
-    fprintf(output_file, "BASELINE TOTAL EXECUTION TIME: %.06f\n\n", baseline_output.total_execution_time);
+    fprintf(output_file, "TRACE READ EXECUTION TIME: %.06lf\n", trace_read_time);
+    fprintf(output_file, "BASELINE EXECUTION TIME: %.06lf\n\n", execution_time);
 
     fclose(output_file);
 

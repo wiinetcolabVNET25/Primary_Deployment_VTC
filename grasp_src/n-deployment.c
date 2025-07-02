@@ -50,8 +50,6 @@ typedef struct n_deployment_input_
 
 typedef struct n_deployment_output_
 {
-    double mean_ite_execution_time;
-    double ite_execution_time;
     pos_2d best_solution[MAX_NUMBER_OF_RSUS];
     int best_solution_obj_f_value;
 
@@ -121,6 +119,7 @@ void reset_vehicles(int *vehicles, int tam);
 int write_summary_to_file(
     struct_n_deployment_input n_deployment_input, 
     struct_n_deployment_output n_deployment_output, 
+    double trace_read_time, double execution_time,
     char *output_error_msg
 );
 
@@ -158,6 +157,8 @@ int main(int argc, char **argv)
 
     // -------------------- 1.2 TRACE FILE -------------------- //
 
+    clock_t begin_trace_read_timer = clock();
+
     trace_line *trace = (trace_line *) malloc(sizeof(trace_line) * MAX_TRACE_SIZE);
     if (!trace)
     {
@@ -175,8 +176,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    fill_scores_in_cells(trace, trace_size, 
-    n_deployment_input.cells, n_deployment_input.contacts_time_threshold, n_deployment_input.number_of_contacts);
+    clock_t end_trace_read_timer = clock();
+    double trace_read_time = (double) (end_trace_read_timer - begin_trace_read_timer) / CLOCKS_PER_SEC;
 
     // ==================== 2 - RUN AND WRITE COVERAGE LOG =========================== //
     char best_coverage_log_file_name[MAX_INPUT_FILE_PATH_SIZE + 250];
@@ -192,12 +193,23 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    clock_t begin_execution_timer = clock();
+
+    fill_scores_in_cells(trace, trace_size, 
+    n_deployment_input.cells, n_deployment_input.contacts_time_threshold, n_deployment_input.number_of_contacts);
+
     struct_n_deployment_output n_deployment_output;
     n_deployment(trace, trace_size, n_deployment_input, &n_deployment_output, best_coverage_log_file);
 
+    clock_t end_execution_timer = clock();
+    double execution_time = (double) (end_execution_timer - begin_execution_timer) / CLOCKS_PER_SEC;
+        
     fclose(best_coverage_log_file);
     // ==================== 3 - WRITE OTHER RESULTS: SUMMARY AND RSUS ================= //
-    status = write_summary_to_file(n_deployment_input, n_deployment_output, error_msg);
+    status = write_summary_to_file(
+        n_deployment_input, n_deployment_output,
+        trace_read_time, execution_time,
+        error_msg);
     if (status != 0)
     {
         fprintf(stderr, "N-DEPLOYMENT: OUTPUT FILE ERROR: %s\n", error_msg);
@@ -394,7 +406,6 @@ void n_deployment(trace_line *trace, int trace_size, struct_n_deployment_input n
     // Used to build the intermediate solutions and then check their objective function values;
 	int cells[ MAX_CELL_GRID_WIDTH ][ MAX_CELL_GRID_HEIGHT ];
 
-    clock_t begin_timer = clock();
     int iteration_index = 0;
     srand(n_deployment_input.grasp_rng_seed);
     for (iteration_index = 0; iteration_index < n_deployment_input.n_deploy_num_ite; iteration_index++)
@@ -447,14 +458,6 @@ void n_deployment(trace_line *trace, int trace_size, struct_n_deployment_input n
             }
 		}
 	}
-
-    clock_t end_timer = clock();
-    double execution_time_in_secs = (double) (end_timer - begin_timer) / CLOCKS_PER_SEC;
-
-    output_n_deployment_output->mean_ite_execution_time = 
-    execution_time_in_secs / n_deployment_input.n_deploy_num_ite;
-    
-    output_n_deployment_output->ite_execution_time = execution_time_in_secs;
 
     output_n_deployment_output->best_solution_obj_f_value = coverage_best_solution;
 }
@@ -579,6 +582,7 @@ void reset_vehicles(int *vehicles, int tam)
 int write_summary_to_file(
     struct_n_deployment_input n_deployment_input, 
     struct_n_deployment_output n_deployment_output, 
+    double trace_read_time, double execution_time,
     char* output_error_msg)
 {
     char output_file_name[MAX_INPUT_FILE_PATH_SIZE + 250];
@@ -601,13 +605,13 @@ int write_summary_to_file(
     fprintf(output_file, "CONTACTS TIME INTERVAL: %d\n", n_deployment_input.contacts_time_threshold);
 
     fprintf(output_file, "GRASP RNG SEED: %d\n", n_deployment_input.grasp_rng_seed);
-    fprintf(output_file, "N-DEPLOY N. ITERATIONS: %d\n", n_deployment_input.n_deploy_num_ite);
+    fprintf(output_file, "GRASP N. ITERATIONS: %d\n", n_deployment_input.n_deploy_num_ite);
     fprintf(output_file, "GRASP RCL LENGTH: %d\n", n_deployment_input.grasp_rcl_len);
 
-    fprintf(output_file, "N-DEPLOY AVERAGE ITERATION EXECUTION TIME: %.06f\n", 
-    n_deployment_output.mean_ite_execution_time);
-    fprintf(output_file, "N-DEPLOY TOTAL EXECUTION TIME (ITERATIONS): %.06f\n\n", 
-    n_deployment_output.ite_execution_time);
+    fprintf(output_file, "TRACE READ EXECUTION TIME: %.06lf\n", 
+        trace_read_time);
+    fprintf(output_file, "N-DEPLOYMENT EXECUTION TIME: %.06f\n\n", 
+        execution_time);
 
     fprintf(output_file, "-------------------- BEST SOLUTION ---------------------------\n\n");
 
